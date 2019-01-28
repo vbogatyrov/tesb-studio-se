@@ -308,6 +308,13 @@ public class CreateMavenBundlePom extends CreateMavenJobPom {
         }
     }
 
+    protected void setProfiles(Model model) {
+        super.setProfiles(model);
+        if (isRoutesSubjob()) {
+            addBundleSuffixToOutputJarName(model);
+        }
+    }
+
     /**
      * enable depoly feature.xml in nexus in feature pom, skip when publish to cloud.
      */
@@ -609,6 +616,22 @@ public class CreateMavenBundlePom extends CreateMavenJobPom {
         return plugin;
     }
 
+
+    private void addBundleSuffixToOutputJarName(Model model) {
+        for (Profile profile : model.getProfiles()) {
+            if (profile.getId().equals("packaging-and-assembly")) {
+                for (Plugin plugin : profile.getBuild().getPlugins()) {
+                    if (plugin.getArtifactId().equals("maven-assembly-plugin")) {
+                        PluginExecution execution = plugin.getExecutions().get(0);
+                        Xpp3Dom configuration = (Xpp3Dom)execution.getConfiguration();
+                        configuration.getChild("finalName").setValue("${talend.job.name}-bundle-${project.version}");
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
     boolean isRoutelet(JobInfo job) {
         if (job != null && job.getProcessItem() != null) {
             Property p = job.getProcessItem().getProperty();
@@ -627,6 +650,22 @@ public class CreateMavenBundlePom extends CreateMavenJobPom {
             }
         }
         return false;
+    }
+
+    /**
+     * Checks if pom-file currently created is
+     * for job used in cTalendJob component.
+     * @return
+     */
+    private boolean isRoutesSubjob() {
+        Property property = getJobProcessor().getProperty();
+        Object buildType = property.getAdditionalProperties().get(TalendProcessArgumentConstant.ARG_BUILD_TYPE);
+        Object type = ERepositoryObjectType.getType(property);
+        if(buildType != null && buildType.equals("ROUTE") && type.equals(ERepositoryObjectType.PROCESS)) {
+            return true;
+        } else {
+            return false;
+        }
     }
 
     public static IProcessor getProcessor(JobInfo jobInfo) {
